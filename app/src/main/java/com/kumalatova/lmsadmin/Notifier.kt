@@ -17,10 +17,6 @@ import java.time.Instant
 
 /** Каналы и уведомления. У каждого сайта свой канал: звук настраивается в системе. */
 object Notifier {
-    const val SERVICE_CHANNEL = "service_quiet"
-    private const val OLD_SERVICE_CHANNEL = "service"
-    const val FGS_ID = 1
-
     const val EXTRA_SITE = "site_id"
     const val EXTRA_GROUP = "group"
     const val EXTRA_ID = "item_id"
@@ -29,21 +25,12 @@ object Notifier {
 
     fun siteChannelId(siteId: String) = "site_$siteId"
 
-    fun ensureServiceChannel(ctx: Context) {
+    /** Постоянного уведомления больше нет: убираем каналы прежних версий. */
+    fun removeOldServiceChannels(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val manager = ctx.getSystemService(NotificationManager::class.java)
-        // Прежний канал был заметнее: убираем, новый почти не виден (без значка в строке состояния).
-        manager.deleteNotificationChannel(OLD_SERVICE_CHANNEL)
-        val channel = NotificationChannel(
-            SERVICE_CHANNEL,
-            "Работа в фоне",
-            NotificationManager.IMPORTANCE_MIN,
-        ).apply {
-            description = "Тихое уведомление, пока приложение следит за сайтами"
-            setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_SECRET
-        }
-        manager.createNotificationChannel(channel)
+        manager.deleteNotificationChannel("service")
+        manager.deleteNotificationChannel("service_quiet")
     }
 
     fun ensureSiteChannel(ctx: Context, site: Site) {
@@ -109,37 +96,6 @@ object Notifier {
 
     fun cancelItem(ctx: Context, siteId: String, group: Group, id: Long) {
         NotificationManagerCompat.from(ctx).cancel(itemNotificationId(siteId, group, id))
-    }
-
-    fun foregroundNotification(ctx: Context, text: String): Notification {
-        val open = PendingIntent.getActivity(
-            ctx,
-            0,
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        return NotificationCompat.Builder(ctx, SERVICE_CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("LMS Админ")
-            .setContentText(text)
-            .setColor(ACCENT)
-            .setOngoing(true)
-            .setSilent(true)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setContentIntent(open)
-            .build()
-    }
-
-    fun updateForeground(ctx: Context, text: String) {
-        if (!canNotify(ctx)) return
-        try {
-            NotificationManagerCompat.from(ctx).notify(FGS_ID, foregroundNotification(ctx, text))
-        } catch (e: SecurityException) {
-            // Разрешения нет: обновлять нечего.
-        }
     }
 
     /** Уведомление о новом обращении: сайт, кто, тема. Видно на экране блокировки. */

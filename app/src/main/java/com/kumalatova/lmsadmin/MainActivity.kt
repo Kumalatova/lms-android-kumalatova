@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         )
 
         // Пока приложение открыто, список на экране обновляется раз в 30 секунд.
-        // Уведомления в фоне показывает служба PollService.
+        // Уведомления в фоне приходят от Poller по расписанию (Schedule).
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (isActive) {
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (vm.sites.value.isNotEmpty()) PollService.start(this)
+        Poller.schedule(this)
     }
 
     override fun onResume() {

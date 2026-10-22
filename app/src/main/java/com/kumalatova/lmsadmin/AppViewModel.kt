@@ -54,7 +54,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var lastReadMark = ""
 
     init {
-        Notifier.ensureServiceChannel(app)
+        Notifier.removeOldServiceChannels(app)
         _sites.value.forEach { Notifier.ensureSiteChannel(app, it) }
     }
 
@@ -152,7 +152,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 store.save(_sites.value)
                 _states.value = _states.value + (site.id to SiteState(counts = r.counts))
                 Notifier.ensureSiteChannel(appCtx, site)
-                PollService.start(appCtx)
+                Poller.schedule(appCtx)
                 return null
             } catch (e: ApiException) {
                 lastError = e.userMessage
