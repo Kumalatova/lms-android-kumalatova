@@ -17,7 +17,8 @@ import java.time.Instant
 
 /** Каналы и уведомления. У каждого сайта свой канал: звук настраивается в системе. */
 object Notifier {
-    const val SERVICE_CHANNEL = "service"
+    const val SERVICE_CHANNEL = "service_quiet"
+    private const val OLD_SERVICE_CHANNEL = "service"
     const val FGS_ID = 1
 
     const val EXTRA_SITE = "site_id"
@@ -30,15 +31,19 @@ object Notifier {
 
     fun ensureServiceChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        // Прежний канал был заметнее: убираем, новый почти не виден (без значка в строке состояния).
+        manager.deleteNotificationChannel(OLD_SERVICE_CHANNEL)
         val channel = NotificationChannel(
             SERVICE_CHANNEL,
             "Работа в фоне",
-            NotificationManager.IMPORTANCE_LOW,
+            NotificationManager.IMPORTANCE_MIN,
         ).apply {
-            description = "Постоянное уведомление, пока приложение следит за сайтами"
+            description = "Тихое уведомление, пока приложение следит за сайтами"
             setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
         }
-        ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        manager.createNotificationChannel(channel)
     }
 
     fun ensureSiteChannel(ctx: Context, site: Site) {
@@ -121,7 +126,8 @@ object Notifier {
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(open)
             .build()
