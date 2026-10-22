@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="lms_bg">#171B22</color>
+    <color name="lms_icon_bg">#212833</color>
+    <color name="lms_badge">#C98A4B</color>
+</resources>
