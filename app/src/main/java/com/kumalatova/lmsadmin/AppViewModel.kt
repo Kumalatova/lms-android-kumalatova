@@ -16,7 +16,9 @@ import org.json.JSONObject
 import java.util.UUID
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
+    private val appCtx: Application = app
     private val store = SiteStore(app)
+    private val seenStore = SeenStore(app)
 
     private val _sites = MutableStateFlow(store.load())
     val sites: StateFlow<List<Site>> = _sites.asStateFlow()
@@ -42,8 +44,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
+    private val _sending = MutableStateFlow(false)
+    val sending: StateFlow<Boolean> = _sending.asStateFlow()
+
+    private val _replyError = MutableStateFlow<String?>(null)
+    val replyError: StateFlow<String?> = _replyError.asStateFlow()
+
     private var noticeJob: Job? = null
     private var lastReadMark = ""
+
+    init {
+        Notifier.ensureServiceChannel(app)
+        _sites.value.forEach { Notifier.ensureSiteChannel(app, it) }
+    }
 
     private fun siteById(id: String): Site? = _sites.value.firstOrNull { it.id == id }
 
@@ -138,6 +151,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _sites.value = _sites.value + site
                 store.save(_sites.value)
                 _states.value = _states.value + (site.id to SiteState(counts = r.counts))
+                Notifier.ensureSiteChannel(appCtx, site)
+                PollService.start(appCtx)
                 return null
             } catch (e: ApiException) {
                 lastError = e.userMessage
@@ -207,6 +222,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _sites.value = _sites.value.filter { it.id != id }
         store.save(_sites.value)
         _states.value = _states.value - id
+        Notifier.deleteSiteChannel(appCtx, id)
+        seenStore.remove(id)
     }
 
     fun openSite(siteId: String) {
@@ -242,7 +259,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openThread(siteId: String, group: Group, id: Long) {
         _thread.value = null
         _threadError.value = null
+        _replyError.value = null
         lastReadMark = ""
+        Notifier.cancelItem(appCtx, siteId, group, id)
         _screen.value = Screen.ThreadView(siteId, group, id)
         viewModelScope.launch { loadThread(siteId, group, id, silent = false) }
     }
@@ -269,6 +288,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!silent || _thread.value == null) _threadError.value = e.userMessage
         } catch (e: Exception) {
             if (!silent || _thread.value == null) _threadError.value = "Сайт ответил с ошибкой"
+        }
+    }
+
+    /** Открыть переписку из уведомления. */
+    fun openFromNotification(siteId: String, groupCode: String, id: Long) {
+        if (siteById(siteId) == null) return
+        val group = Group.from(groupCode)
+        // Список группы под перепиской, чтобы "назад" вёл в нужное место.
+        _list.value = ListState(group = group, loading = true)
+        viewModelScope.launch { loadList(siteId, group, silent = false) }
+        openThread(siteId, group, id)
+    }
+
+    /** Отправить ответ в открытую переписку. onDone вызывается при успехе. */
+    fun sendReply(text: String, onDone: () -> Unit) {
+        val s = _screen.value as? Screen.ThreadView ?: return
+        val site = siteById(s.siteId) ?: return
+        val clean = text.trim()
+        if (clean.isEmpty() || _sending.value) return
+        _sending.value = true
+        _replyError.value = null
+        viewModelScope.launch {
+            try {
+                val data = Api.reply(site, s.group, s.id, clean)
+                _thread.value = data
+                lastReadMark = "${s.id}:${data.messages.lastOrNull()?.id ?: 0}"
+                Notifier.cancelItem(appCtx, s.siteId, s.group, s.id)
+                onDone()
+                refreshAll()
+            } catch (e: ApiException) {
+                _replyError.value = e.userMessage
+            } catch (e: Exception) {
+                _replyError.value = "Не удалось отправить ответ"
+            } finally {
+                _sending.value = false
+            }
         }
     }
 

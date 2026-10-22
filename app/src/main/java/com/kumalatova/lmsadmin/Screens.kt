@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -64,7 +65,12 @@ fun Badge(count: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun TopBar(title: String, onBack: (() -> Unit)?) {
+fun TopBar(
+    title: String,
+    onBack: (() -> Unit)?,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,7 +94,18 @@ fun TopBar(title: String, onBack: (() -> Unit)?) {
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        if (actionText != null && onAction != null) {
+            Text(
+                text = actionText,
+                color = LmsColors.Badge,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .clickable { onAction() }
+                    .padding(start = 12.dp),
+            )
+        }
     }
     Box(
         Modifier
@@ -107,11 +124,30 @@ fun HomeScreen(
     onOpen: (Site) -> Unit,
     onAdd: () -> Unit,
     onRemove: (Site) -> Unit,
+    notificationsOn: Boolean,
+    onEnableNotifications: () -> Unit,
 ) {
     var confirmId by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         TopBar(title = "Мои сайты", onBack = null)
+        if (!notificationsOn) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LmsColors.RowActive)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Уведомления выключены, звука не будет",
+                    color = LmsColors.Text,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButtonLike("Включить") { onEnableNotifications() }
+            }
+        }
         LazyColumn(Modifier.fillMaxSize()) {
             items(sites, key = { it.id }) { site ->
                 val state = states[site.id]
@@ -225,9 +261,10 @@ fun SiteScreen(
     onBack: () -> Unit,
     onGroup: (Group) -> Unit,
     onOpenItem: (ListItem) -> Unit,
+    onSound: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        TopBar(title = site.name, onBack = onBack)
+        TopBar(title = site.name, onBack = onBack, actionText = "Звук", onAction = onSound)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -334,14 +371,19 @@ fun ItemRow(item: ListItem, onClick: () -> Unit) {
     )
 }
 
-/** Переписка. Пока только чтение, ответ добавим в блоке 5. */
+/** Переписка и поле ответа. */
 @Composable
 fun ThreadScreen(
     thread: ThreadData?,
     error: String?,
+    sending: Boolean,
+    replyError: String?,
     onBack: () -> Unit,
+    onSend: (String, () -> Unit) -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
+    var text by remember { mutableStateOf("") }
+
+    Column(Modifier.fillMaxSize().imePadding()) {
         TopBar(
             title = if (thread != null) "${thread.person} · ${thread.topic}" else "Переписка",
             onBack = onBack,
@@ -356,14 +398,72 @@ fun ThreadScreen(
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp),
                 ) {
-                    if (thread.to.isNotEmpty()) {
-                        item { InfoText("Адресовано: ${thread.to}") }
-                    }
                     items(thread.messages, key = { it.id }) { m ->
                         Bubble(m)
+                    }
+                }
+
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(LmsColors.Line),
+                )
+                Text(
+                    text = "Ответ уйдёт от имени: " +
+                        (if (thread.to.isNotEmpty()) thread.to else "администратора"),
+                    color = LmsColors.Dim,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
+                )
+                if (replyError != null) {
+                    Text(
+                        text = replyError,
+                        color = LmsColors.Badge,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 4.dp),
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        placeholder = { Text("Ваш ответ") },
+                        maxLines = 5,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = LmsColors.Text,
+                            unfocusedTextColor = LmsColors.Text,
+                            focusedBorderColor = LmsColors.Badge,
+                            unfocusedBorderColor = LmsColors.Dim,
+                            cursorColor = LmsColors.Badge,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp, bottom = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (text.isBlank() || sending) LmsColors.RowActive else LmsColors.Badge)
+                            .clickable(enabled = text.isNotBlank() && !sending) {
+                                onSend(text) { text = "" }
+                            }
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (sending) "…" else "Отправить",
+                            color = if (text.isBlank() || sending) LmsColors.Muted else LmsColors.BadgeText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }

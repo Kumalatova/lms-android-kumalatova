@@ -118,8 +118,7 @@ object Api {
         }
     }
 
-    suspend fun thread(site: Site, group: Group, id: Long): ThreadData = withContext(Dispatchers.IO) {
-        val o = get(site, "thread", mapOf("group" to group.code, "id" to id.toString()))
+    private fun threadFrom(o: JSONObject, group: Group): ThreadData {
         val arr = o.getJSONArray("messages")
         val messages = (0 until arr.length()).map { i ->
             val m = arr.getJSONObject(i)
@@ -132,13 +131,25 @@ object Api {
                 time = m.optString("time"),
             )
         }
-        ThreadData(
+        return ThreadData(
             id = o.getLong("id"),
             group = group,
             topic = o.optString("topic"),
             person = o.optString("person"),
             to = o.optString("to"),
             messages = messages,
+        )
+    }
+
+    suspend fun thread(site: Site, group: Group, id: Long): ThreadData = withContext(Dispatchers.IO) {
+        threadFrom(get(site, "thread", mapOf("group" to group.code, "id" to id.toString())), group)
+    }
+
+    /** Ответ из приложения. Возвращает обновлённую переписку. */
+    suspend fun reply(site: Site, group: Group, id: Long, text: String): ThreadData = withContext(Dispatchers.IO) {
+        threadFrom(
+            post(site, "reply", mapOf("group" to group.code, "id" to id.toString(), "message" to text)),
+            group,
         )
     }
 
