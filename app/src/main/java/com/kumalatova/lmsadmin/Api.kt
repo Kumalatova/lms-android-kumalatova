@@ -32,23 +32,33 @@ object Api {
         return builder.build()
     }
 
+    /** Текст ошибки WordPress из ответа вида {"code":"...","message":"..."}. */
+    private fun serverMessage(body: String): String {
+        return try {
+            JSONObject(body).optString("message")
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     private fun call(request: Request): String {
         try {
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.isSuccessful) return body
-                throw ApiException(
-                    when (response.code) {
-                        401 -> "Ключ не подходит или отозван"
-                        403 -> "Нет доступа к сайту"
-                        404 -> "Плагин на сайте не найден"
-                        429 -> "Слишком много попыток, подождите"
-                        else -> "Ошибка сайта (${response.code})"
-                    },
-                )
+                val base = when (response.code) {
+                    401 -> "Ключ не подходит или отозван"
+                    403 -> "Нет доступа"
+                    404 -> "Плагин на сайте не найден"
+                    429 -> "Слишком много попыток, подождите"
+                    else -> "Ошибка сайта"
+                }
+                val detail = serverMessage(body)
+                val tail = if (detail.isNotEmpty()) ": $detail" else ""
+                throw ApiException("$base (код ${response.code})$tail")
             }
         } catch (e: IOException) {
-            throw ApiException("Нет связи с сайтом")
+            throw ApiException("Нет связи с сайтом (${e.javaClass.simpleName})")
         }
     }
 
@@ -76,7 +86,8 @@ object Api {
         return try {
             JSONObject(body)
         } catch (e: Exception) {
-            throw ApiException("Сайт ответил не так, как ждёт приложение")
+            val start = body.trim().replace(Regex("\\s+"), " ").take(60)
+            throw ApiException("Сайт ответил не так, как ждёт приложение. Начало ответа: $start")
         }
     }
 

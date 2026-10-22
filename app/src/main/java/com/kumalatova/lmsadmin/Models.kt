@@ -77,6 +77,12 @@ data class ThreadData(
 
 sealed interface Screen {
     data object Home : Screen
+    data object AddSite : Screen
     data class SiteView(val siteId: String) : Screen
     data class ThreadView(val siteId: String, val group: Group, val id: Long) : Screen
 }
+
+data class AddState(
+    val loading: Boolean = false,
+    val error: String? = null,
+)

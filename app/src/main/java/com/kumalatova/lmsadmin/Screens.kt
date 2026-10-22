@@ -21,7 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -403,6 +407,99 @@ fun Bubble(m: com.kumalatova.lmsadmin.Message) {
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+        }
+    }
+}
+
+
+/** Добавление сайта: адрес и ключ вручную или QR-код. */
+@Composable
+fun AddSiteScreen(
+    state: AddState,
+    onBack: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+    onScan: () -> Unit,
+) {
+    var url by remember { mutableStateOf("") }
+    var key by remember { mutableStateOf("") }
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = LmsColors.Text,
+        unfocusedTextColor = LmsColors.Text,
+        focusedBorderColor = LmsColors.Badge,
+        unfocusedBorderColor = LmsColors.Dim,
+        focusedLabelColor = LmsColors.Badge,
+        unfocusedLabelColor = LmsColors.Muted,
+        cursorColor = LmsColors.Badge,
+    )
+
+    Column(Modifier.fillMaxSize()) {
+        TopBar(title = "Добавить сайт", onBack = onBack)
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
+            Text(
+                text = "Адрес сайта и ключ берутся на странице «Курсы → Мобильное приложение» на сайте.",
+                color = LmsColors.Muted,
+                fontSize = 13.sp,
+            )
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                label = { Text("Адрес сайта") },
+                placeholder = { Text("https://example.com") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                colors = fieldColors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp),
+            )
+            OutlinedTextField(
+                value = key,
+                onValueChange = { key = it },
+                label = { Text("Ключ") },
+                placeholder = { Text("lmsk_…") },
+                singleLine = true,
+                colors = fieldColors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+            )
+
+            if (state.error != null) {
+                Text(
+                    text = state.error,
+                    color = LmsColors.Badge,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LmsColors.Badge)
+                    .clickable(enabled = !state.loading) { onSubmit(url, key) }
+                    .padding(vertical = 13.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (state.loading) "Подключаюсь…" else "Подключить",
+                    color = LmsColors.BadgeText,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            Text(
+                text = "Сканировать QR-код",
+                color = LmsColors.Muted,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !state.loading) { onScan() }
+                    .padding(vertical = 18.dp),
+            )
         }
     }
 }

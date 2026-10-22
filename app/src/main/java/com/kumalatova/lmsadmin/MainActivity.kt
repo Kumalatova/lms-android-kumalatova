@@ -72,6 +72,7 @@ fun AppRoot(vm: AppViewModel) {
     val thread by vm.thread.collectAsStateWithLifecycle()
     val threadError by vm.threadError.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
+    val addState by vm.add.collectAsStateWithLifecycle()
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents
@@ -92,7 +93,15 @@ fun AppRoot(vm: AppViewModel) {
                 sites = sites,
                 states = states,
                 onOpen = { vm.openSite(it.id) },
-                onAdd = {
+                onAdd = { vm.openAdd() },
+                onRemove = { vm.removeSite(it.id) },
+            )
+
+            Screen.AddSite -> AddSiteScreen(
+                state = addState,
+                onBack = { vm.back() },
+                onSubmit = { url, key -> vm.addSiteManual(url, key) },
+                onScan = {
                     scanner.launch(
                         ScanOptions()
                             .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
@@ -101,7 +110,6 @@ fun AppRoot(vm: AppViewModel) {
                             .setOrientationLocked(false),
                     )
                 },
-                onRemove = { vm.removeSite(it.id) },
             )
 
             is Screen.SiteView -> {

@@ -36,6 +36,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _threadError = MutableStateFlow<String?>(null)
     val threadError: StateFlow<String?> = _threadError.asStateFlow()
 
+    private val _add = MutableStateFlow(AddState())
+    val add: StateFlow<AddState> = _add.asStateFlow()
+
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
@@ -48,7 +51,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _notice.value = text
         noticeJob?.cancel()
         noticeJob = viewModelScope.launch {
-            delay(6000)
+            delay(10_000)
             _notice.value = null
         }
     }
@@ -64,7 +67,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         when (val s = _screen.value) {
             is Screen.SiteView -> loadList(s.siteId, _list.value.group, silent = true)
             is Screen.ThreadView -> loadThread(s.siteId, s.group, s.id, silent = true)
-            Screen.Home -> Unit
+            Screen.Home, Screen.AddSite -> Unit
         }
     }
 
@@ -96,34 +99,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { refreshAll() }
     }
 
-    /** Добавление сайта из QR-кода плагина: {"v":1,"site":"...","api":"...","key":"..."}. */
-    fun addSiteFromQr(text: String) {
-        viewModelScope.launch {
-            val data = try {
-                JSONObject(text)
-            } catch (e: Exception) {
-                showNotice("Это не QR-код плагина")
-                return@launch
-            }
-            val siteUrl = data.optString("site")
-            val key = data.optString("key")
-            var api = data.optString("api")
-            if (siteUrl.isEmpty() || key.isEmpty()) {
-                showNotice("Это не QR-код плагина")
-                return@launch
-            }
-            if (!siteUrl.startsWith("https://")) {
-                showNotice("Сайт должен работать по https")
-                return@launch
-            }
-            if (api.isEmpty()) {
-                api = siteUrl.trimEnd('/') + "/wp-json/my-lms-mobile/v1/"
-            }
-            if (_sites.value.any { it.key == key }) {
-                showNotice("Этот сайт уже добавлен")
-                return@launch
-            }
+    fun openAdd() {
+        _add.value = AddState()
+        _screen.value = Screen.AddSite
+    }
 
+    /** Приводит адрес к виду https://сайт/ . Возвращает null, если адрес не подходит. */
+    private fun normalizeUrl(raw: String): String? {
+        var u = raw.trim()
+        if (u.isEmpty()) return null
+        if (u.startsWith("http://")) return null
+        if (!u.startsWith("https://")) u = "https://$u"
+        if (!u.endsWith("/")) u += "/"
+        return u
+    }
+
+    /**
+     * Подключает сайт: пробует адреса обращений по очереди (свой из QR,
+     * затем обычный wp-json, затем запасной ?rest_route=).
+     * Возвращает текст ошибки или null, если сайт добавлен.
+     */
+    private suspend fun connect(siteUrl: String, apiFromQr: String?, key: String): String? {
+        if (_sites.value.any { it.key == key }) return "Этот сайт уже добавлен"
+
+        val candidates = listOfNotNull(
+            apiFromQr?.takeIf { it.isNotEmpty() },
+            siteUrl + "wp-json/my-lms-mobile/v1/",
+            siteUrl + "?rest_route=/my-lms-mobile/v1/",
+        ).distinct()
+
+        var lastError = "Не удалось подключиться"
+        for (api in candidates) {
             val probe = Site(UUID.randomUUID().toString(), "", siteUrl, api, key)
             try {
                 val r = Api.summary(probe)
@@ -132,11 +138,67 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _sites.value = _sites.value + site
                 store.save(_sites.value)
                 _states.value = _states.value + (site.id to SiteState(counts = r.counts))
-                showNotice("Сайт «$name» добавлен")
+                return null
             } catch (e: ApiException) {
-                showNotice(e.userMessage)
+                lastError = e.userMessage
+                // Ключ не подошёл: другие адреса не помогут.
+                if (e.userMessage.startsWith("Ключ не подходит")) break
             } catch (e: Exception) {
-                showNotice("Не удалось добавить сайт")
+                lastError = "Не удалось подключиться"
+            }
+        }
+        return lastError
+    }
+
+    /** Добавление по адресу и ключу, введённым вручную. */
+    fun addSiteManual(rawUrl: String, rawKey: String) {
+        val url = normalizeUrl(rawUrl)
+        val key = rawKey.trim()
+        if (url == null) {
+            _add.value = AddState(error = "Введите адрес сайта, начиная с https://")
+            return
+        }
+        if (key.isEmpty()) {
+            _add.value = AddState(error = "Введите ключ")
+            return
+        }
+        _add.value = AddState(loading = true)
+        viewModelScope.launch {
+            val error = connect(url, null, key)
+            if (error == null) {
+                _add.value = AddState()
+                _screen.value = Screen.Home
+                showNotice("Сайт добавлен")
+            } else {
+                _add.value = AddState(error = error)
+            }
+        }
+    }
+
+    /** Добавление из QR-кода плагина: {"v":1,"site":"...","api":"...","key":"..."}. */
+    fun addSiteFromQr(text: String) {
+        val data = try {
+            JSONObject(text)
+        } catch (e: Exception) {
+            _add.value = AddState(error = "Это не QR-код плагина")
+            return
+        }
+        val url = normalizeUrl(data.optString("site"))
+        val key = data.optString("key").trim()
+        if (url == null || key.isEmpty()) {
+            _add.value = AddState(error = "Это не QR-код плагина или сайт без https")
+            return
+        }
+        _screen.value = Screen.AddSite
+        _add.value = AddState(loading = true)
+        viewModelScope.launch {
+            val error = connect(url, data.optString("api"), key)
+            if (error == null) {
+                _add.value = AddState()
+                _screen.value = Screen.Home
+                showNotice("Сайт добавлен")
+            } else {
+                _add.value = AddState(error = error)
             }
         }
     }
@@ -224,6 +286,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is Screen.SiteView -> {
                 _screen.value = Screen.Home
                 refreshNow()
+                true
+            }
+            Screen.AddSite -> {
+                _screen.value = Screen.Home
                 true
             }
             Screen.Home -> false
