@@ -9,11 +9,12 @@ data class Site(
     val key: String,
 )
 
-/** Три группы обращений. */
+/** Группы: три вида обращений и продажи (продажи — только уведомление). */
 enum class Group(val code: String, val title: String) {
     Tickets("tickets", "Тикеты"),
     Teachers("teachers", "Преподавателям"),
-    Shop("shop", "Магазин");
+    Shop("shop", "Магазин"),
+    Sales("sales", "Продажи");
 
     companion object {
         fun from(code: String): Group = entries.firstOrNull { it.code == code } ?: Tickets
@@ -24,13 +25,15 @@ data class Counts(
     val tickets: Int,
     val teachers: Int,
     val shop: Int,
+    val sales: Int = 0,
 ) {
-    val total: Int get() = tickets + teachers + shop
+    val total: Int get() = tickets + teachers + shop + sales
 
     fun of(group: Group): Int = when (group) {
         Group.Tickets -> tickets
         Group.Teachers -> teachers
         Group.Shop -> shop
+        Group.Sales -> sales
     }
 }
 

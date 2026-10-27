@@ -93,7 +93,7 @@ object Api {
 
     private fun counts(o: JSONObject): Counts {
         val c = o.getJSONObject("counts")
-        return Counts(c.optInt("tickets"), c.optInt("teachers"), c.optInt("shop"))
+        return Counts(c.optInt("tickets"), c.optInt("teachers"), c.optInt("shop"), c.optInt("sales"))
     }
 
     suspend fun summary(site: Site): SummaryResult = withContext(Dispatchers.IO) {

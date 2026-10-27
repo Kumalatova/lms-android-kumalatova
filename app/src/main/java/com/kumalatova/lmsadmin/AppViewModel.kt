@@ -249,6 +249,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (_list.value.group == group) {
                 _list.value = ListState(group = group, items = items)
             }
+            // Список продаж открыт: новые считаются просмотренными, значок гаснет.
+            if (group == Group.Sales && items.any { it.unread > 0 }) {
+                try {
+                    Api.markRead(site, Group.Sales, 0)
+                    refreshAll()
+                } catch (e: ApiException) {
+                    // Не критично: отметим при следующем открытии.
+                }
+            }
         } catch (e: ApiException) {
             if (_list.value.group == group) _list.value = _list.value.copy(loading = false, error = e.userMessage)
         } catch (e: Exception) {
@@ -257,6 +266,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openThread(siteId: String, group: Group, id: Long) {
+        // Продажа — только уведомление: переписки у неё нет.
+        if (group == Group.Sales) return
         _thread.value = null
         _threadError.value = null
         _replyError.value = null
@@ -295,6 +306,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openFromNotification(siteId: String, groupCode: String, id: Long) {
         if (siteById(siteId) == null) return
         val group = Group.from(groupCode)
+        if (group == Group.Sales) {
+            // У продажи нет переписки: открываем вкладку «Продажи» сайта.
+            _screen.value = Screen.SiteView(siteId)
+            _list.value = ListState(group = group, loading = true)
+            viewModelScope.launch { loadList(siteId, group, silent = false) }
+            return
+        }
         // Список группы под перепиской, чтобы "назад" вёл в нужное место.
         _list.value = ListState(group = group, loading = true)
         viewModelScope.launch { loadList(siteId, group, silent = false) }
