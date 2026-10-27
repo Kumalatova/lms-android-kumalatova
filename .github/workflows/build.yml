@@ -42,3 +42,5 @@ jobs:
             gh release create latest --title "Последняя сборка" --notes "Свежий APK. Скачайте lms-admin.apk и установите поверх прежнего."
           fi
           gh release upload latest lms-admin.apk --clobber
+          echo '{"code":${{ github.run_number }},"name":"0.1.${{ github.run_number }}"}' > version.json
+          gh release upload latest version.json --clobber

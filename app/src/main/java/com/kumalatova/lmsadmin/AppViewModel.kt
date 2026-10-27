@@ -50,6 +50,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _replyError = MutableStateFlow<String?>(null)
     val replyError: StateFlow<String?> = _replyError.asStateFlow()
 
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.None)
+    val update: StateFlow<UpdateState> = _update.asStateFlow()
+
     private var noticeJob: Job? = null
     private var lastReadMark = ""
 
@@ -66,6 +69,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         noticeJob = viewModelScope.launch {
             delay(10_000)
             _notice.value = null
+        }
+    }
+
+    /** Проверяет, не вышла ли новая версия приложения. */
+    fun checkUpdate() {
+        if (_update.value is UpdateState.Downloading) return
+        viewModelScope.launch {
+            val info = Updater.check(appCtx)
+            if (info != null) _update.value = UpdateState.Available(info)
+            else if (_update.value is UpdateState.Available) _update.value = UpdateState.None
+        }
+    }
+
+    /** Скачивает новую версию и открывает окно установки. */
+    fun startUpdate() {
+        val info = when (val s = _update.value) {
+            is UpdateState.Available -> s.info
+            is UpdateState.Failed -> s.info
+            else -> return
+        }
+        if (!Updater.canInstall(appCtx)) {
+            Updater.openInstallPermission(appCtx)
+            showNotice("Разрешите установку из этого приложения и нажмите «Обновить» ещё раз")
+            return
+        }
+        _update.value = UpdateState.Downloading(info)
+        viewModelScope.launch {
+            try {
+                val file = Updater.download(appCtx)
+                Updater.install(appCtx, file)
+                _update.value = UpdateState.Available(info)
+            } catch (e: ApiException) {
+                _update.value = UpdateState.Failed(info, e.userMessage)
+            } catch (e: Exception) {
+                _update.value = UpdateState.Failed(info, "нет связи")
+            }
         }
     }
 

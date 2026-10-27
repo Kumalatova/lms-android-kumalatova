@@ -128,6 +128,9 @@ fun HomeScreen(
     onRemove: (Site) -> Unit,
     notificationsOn: Boolean,
     onEnableNotifications: () -> Unit,
+    update: UpdateState,
+    onUpdate: () -> Unit,
+    versionName: String,
 ) {
     var confirmId by remember { mutableStateOf<String?>(null) }
 
@@ -148,6 +151,26 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                 )
                 TextButtonLike("Включить") { onEnableNotifications() }
+            }
+        }
+        if (update !is UpdateState.None) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LmsColors.RowActive)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val text = when (update) {
+                    is UpdateState.Available -> "Доступна новая версия ${update.info.name}"
+                    is UpdateState.Downloading -> "Скачиваю обновление…"
+                    is UpdateState.Failed -> "Не удалось скачать: ${update.message}"
+                    UpdateState.None -> ""
+                }
+                Text(text = text, color = LmsColors.Text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                if (update !is UpdateState.Downloading) {
+                    TextButtonLike(if (update is UpdateState.Failed) "Ещё раз" else "Обновить") { onUpdate() }
+                }
             }
         }
         LazyColumn(Modifier.fillMaxSize()) {
@@ -236,6 +259,12 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 14.dp),
                     )
                 }
+                Text(
+                    text = "Версия приложения $versionName",
+                    color = LmsColors.Dim,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                )
             }
         }
     }

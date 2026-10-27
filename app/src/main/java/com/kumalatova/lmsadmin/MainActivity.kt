@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Poller.schedule(this)
+        vm.checkUpdate()
     }
 
     override fun onResume() {
@@ -142,6 +143,8 @@ fun AppRoot(
     val sending by vm.sending.collectAsStateWithLifecycle()
     val replyError by vm.replyError.collectAsStateWithLifecycle()
     val notifOn by notificationsOn.collectAsStateWithLifecycle()
+    val update by vm.update.collectAsStateWithLifecycle()
+    val versionName = Updater.currentName(androidx.compose.ui.platform.LocalContext.current)
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents
@@ -166,6 +169,9 @@ fun AppRoot(
                 onRemove = { vm.removeSite(it.id) },
                 notificationsOn = notifOn,
                 onEnableNotifications = onEnableNotifications,
+                update = update,
+                onUpdate = { vm.startUpdate() },
+                versionName = versionName,
             )
 
             Screen.AddSite -> AddSiteScreen(
