@@ -271,8 +271,8 @@ fun SiteScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Group.entries.forEach { group ->
                 val active = group == list.group
@@ -281,17 +281,18 @@ fun SiteScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(if (active) LmsColors.RowActive else LmsColors.Row)
                         .clickable { onGroup(group) }
-                        .padding(horizontal = 11.dp, vertical = 7.dp),
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = group.title,
                         color = if (active) LmsColors.Text else LmsColors.Muted,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
+                        maxLines = 1,
                     )
                     val n = counts?.of(group) ?: 0
                     if (n > 0) {
-                        Spacer(Modifier.padding(start = 6.dp))
+                        Spacer(Modifier.padding(start = 4.dp))
                         Badge(n)
                     }
                 }
