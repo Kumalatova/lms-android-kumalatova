@@ -50,6 +50,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _replyError = MutableStateFlow<String?>(null)
     val replyError: StateFlow<String?> = _replyError.asStateFlow()
 
+    private val settingsStore = PollSettingsStore(app)
+    private val _pollSettings = MutableStateFlow(settingsStore.load())
+    val pollSettings: StateFlow<PollSettings> = _pollSettings.asStateFlow()
+
     private val _update = MutableStateFlow<UpdateState>(UpdateState.None)
     val update: StateFlow<UpdateState> = _update.asStateFlow()
 
@@ -108,6 +112,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun openSettings() {
+        _screen.value = Screen.Settings
+    }
+
+    /** Сохраняет настройки опроса и сразу пересчитывает время ближайшего опроса. */
+    fun updateSettings(new: PollSettings) {
+        val start = new.startHour.coerceIn(0, 22)
+        val fixed = new.copy(
+            startHour = start,
+            endHour = new.endHour.coerceIn(start + 1, 24),
+        )
+        settingsStore.save(fixed)
+        _pollSettings.value = fixed
+        Poller.schedule(appCtx)
+    }
+
     fun dismissNotice() {
         noticeJob?.cancel()
         _notice.value = null
@@ -119,7 +139,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         when (val s = _screen.value) {
             is Screen.SiteView -> loadList(s.siteId, _list.value.group, silent = true)
             is Screen.ThreadView -> loadThread(s.siteId, s.group, s.id, silent = true)
-            Screen.Home, Screen.AddSite -> Unit
+            Screen.Home, Screen.AddSite, Screen.Settings -> Unit
         }
     }
 
@@ -400,7 +420,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 refreshNow()
                 true
             }
-            Screen.AddSite -> {
+            Screen.AddSite, Screen.Settings -> {
                 _screen.value = Screen.Home
                 true
             }

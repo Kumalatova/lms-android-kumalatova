@@ -144,6 +144,7 @@ fun AppRoot(
     val replyError by vm.replyError.collectAsStateWithLifecycle()
     val notifOn by notificationsOn.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+    val pollSettings by vm.pollSettings.collectAsStateWithLifecycle()
     val versionName = Updater.currentName(androidx.compose.ui.platform.LocalContext.current)
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -172,6 +173,13 @@ fun AppRoot(
                 update = update,
                 onUpdate = { vm.startUpdate() },
                 versionName = versionName,
+                onSettings = { vm.openSettings() },
+            )
+
+            Screen.Settings -> SettingsScreen(
+                settings = pollSettings,
+                onChange = { vm.updateSettings(it) },
+                onBack = { vm.back() },
             )
 
             Screen.AddSite -> AddSiteScreen(

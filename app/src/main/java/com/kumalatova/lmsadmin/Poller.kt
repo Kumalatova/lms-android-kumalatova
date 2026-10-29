@@ -38,7 +38,7 @@ object Poller {
             alarms.cancel(operation)
             return
         }
-        val triggerAt = SystemClock.elapsedRealtime() + Schedule.nextDelay(System.currentTimeMillis())
+        val triggerAt = SystemClock.elapsedRealtime() + Schedule.nextDelay(System.currentTimeMillis(), PollSettingsStore(app).load())
         try {
             if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()) {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, operation)

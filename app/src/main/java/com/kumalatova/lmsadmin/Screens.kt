@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -131,11 +132,12 @@ fun HomeScreen(
     update: UpdateState,
     onUpdate: () -> Unit,
     versionName: String,
+    onSettings: () -> Unit,
 ) {
     var confirmId by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar(title = "Мои сайты", onBack = null)
+        TopBar(title = "Мои сайты", onBack = null, actionText = "Опрос", onAction = onSettings)
         if (!notificationsOn) {
             Row(
                 modifier = Modifier
@@ -635,4 +637,149 @@ fun AddSiteScreen(
             )
         }
     }
+}
+
+/** Настройки опроса: рабочие дни и часы, как часто опрашивать. Время московское. */
+@Composable
+fun SettingsScreen(
+    settings: PollSettings,
+    onChange: (PollSettings) -> Unit,
+    onBack: () -> Unit,
+) {
+    val dayNames = listOf(1 to "Пн", 2 to "Вт", 3 to "Ср", 4 to "Чт", 5 to "Пт", 6 to "Сб", 7 to "Вс")
+    val workOptions = listOf(1, 2, 3, 5, 10, 15, 30)
+    val offOptions = listOf(15, 30, 60, 120, 240, 480)
+
+    Column(Modifier.fillMaxSize()) {
+        TopBar(title = "Опрос сайтов", onBack = onBack)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SettingsTitle("Рабочие дни")
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                dayNames.forEach { (num, name) ->
+                    OptionChip(name, num in settings.days) {
+                        val days = if (num in settings.days) settings.days - num else settings.days + num
+                        onChange(settings.copy(days = days))
+                    }
+                }
+            }
+
+            SettingsTitle("Рабочее время")
+            HourStepper(
+                label = "С",
+                hour = settings.startHour,
+                onMinus = { if (settings.startHour > 0) onChange(settings.copy(startHour = settings.startHour - 1)) },
+                onPlus = {
+                    if (settings.startHour < settings.endHour - 1) {
+                        onChange(settings.copy(startHour = settings.startHour + 1))
+                    }
+                },
+            )
+            HourStepper(
+                label = "До",
+                hour = settings.endHour,
+                onMinus = {
+                    if (settings.endHour > settings.startHour + 1) {
+                        onChange(settings.copy(endHour = settings.endHour - 1))
+                    }
+                },
+                onPlus = { if (settings.endHour < 24) onChange(settings.copy(endHour = settings.endHour + 1)) },
+            )
+
+            SettingsTitle("Как часто в рабочее время")
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                workOptions.forEach { m ->
+                    OptionChip(minutesLabel(m), settings.workMinutes == m) {
+                        onChange(settings.copy(workMinutes = m))
+                    }
+                }
+            }
+
+            SettingsTitle("Как часто в остальное время")
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                offOptions.forEach { m ->
+                    OptionChip(minutesLabel(m), settings.offMinutes == m) {
+                        onChange(settings.copy(offMinutes = m))
+                    }
+                }
+            }
+
+            Text(
+                text = "Время московское. Изменения сохраняются сразу. Когда телефон долго лежит без движения с выключенным экраном, Android сам может растягивать интервалы.",
+                color = LmsColors.Dim,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+            )
+        }
+    }
+}
+
+private fun minutesLabel(m: Int): String = if (m < 60) "$m мин" else "${m / 60} ч"
+
+@Composable
+private fun SettingsTitle(text: String) {
+    Text(
+        text = text,
+        color = LmsColors.Muted,
+        fontSize = 13.sp,
+        modifier = Modifier.padding(top = 10.dp),
+    )
+}
+
+@Composable
+private fun OptionChip(text: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text = text,
+        color = if (active) LmsColors.Text else LmsColors.Muted,
+        fontSize = 13.sp,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (active) LmsColors.RowActive else LmsColors.Row)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun HourStepper(label: String, hour: Int, onMinus: () -> Unit, onPlus: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text = label, color = LmsColors.Muted, fontSize = 14.sp, modifier = Modifier.widthIn(min = 36.dp))
+        StepperSign("−", onMinus)
+        Text(
+            text = "$hour:00",
+            color = LmsColors.Text,
+            fontSize = 16.sp,
+            modifier = Modifier.widthIn(min = 64.dp).padding(horizontal = 8.dp),
+        )
+        StepperSign("+", onPlus)
+    }
+}
+
+@Composable
+private fun StepperSign(sign: String, onClick: () -> Unit) {
+    Text(
+        text = sign,
+        color = LmsColors.Text,
+        fontSize = 18.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(LmsColors.Row)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
