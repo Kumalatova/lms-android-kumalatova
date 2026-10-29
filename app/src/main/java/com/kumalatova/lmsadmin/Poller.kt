@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -108,6 +109,14 @@ class PollReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         // Следующий опрос ставим сразу: цепочка не оборвётся, даже если этот не удастся.
         Poller.schedule(app)
+
+        // Основной путь: короткая служба, без ограничения в 9 секунд.
+        try {
+            ContextCompat.startForegroundService(app, Intent(app, CheckService::class.java))
+            return
+        } catch (e: Exception) {
+            // Система не разрешила запуск службы: запасной путь ниже.
+        }
 
         val result = goAsync()
         val pm = app.getSystemService(Context.POWER_SERVICE) as PowerManager

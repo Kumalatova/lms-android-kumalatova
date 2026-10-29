@@ -25,12 +25,42 @@ object Notifier {
 
     fun siteChannelId(siteId: String) = "site_$siteId"
 
-    /** Постоянного уведомления больше нет: убираем каналы прежних версий. */
+    const val SERVICE_CHANNEL = "service_quiet"
+    const val FGS_ID = 1
+
+    /** Прежний заметный канал службы убираем. */
     fun removeOldServiceChannels(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
-        val manager = ctx.getSystemService(NotificationManager::class.java)
-        manager.deleteNotificationChannel("service")
-        manager.deleteNotificationChannel("service_quiet")
+        ctx.getSystemService(NotificationManager::class.java).deleteNotificationChannel("service")
+    }
+
+    /** Канал короткой службы опроса: минимальная важность, без звука и значка. */
+    fun ensureServiceChannel(ctx: Context) {
+        if (Build.VERSION.SDK_INT < 26) return
+        val channel = NotificationChannel(
+            SERVICE_CHANNEL,
+            "Работа в фоне",
+            NotificationManager.IMPORTANCE_MIN,
+        ).apply {
+            description = "Появляется на секунды, пока приложение проверяет сайты"
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
+        }
+        ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    fun foregroundNotification(ctx: Context, text: String): Notification {
+        return NotificationCompat.Builder(ctx, SERVICE_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("LMS Админ")
+            .setContentText(text)
+            .setColor(ACCENT)
+            .setOngoing(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
     }
 
     fun ensureSiteChannel(ctx: Context, site: Site) {
