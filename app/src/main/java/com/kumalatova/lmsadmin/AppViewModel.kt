@@ -192,6 +192,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _states.value = _states.value + (site.id to SiteState(counts = r.counts))
                 Notifier.ensureSiteChannel(appCtx, site)
                 Poller.schedule(appCtx)
+                KeepAliveService.start(appCtx)
                 return null
             } catch (e: ApiException) {
                 lastError = e.userMessage
@@ -262,6 +263,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.save(_sites.value)
         _states.value = _states.value - id
         Notifier.deleteSiteChannel(appCtx, id)
+        if (_sites.value.isEmpty()) {
+            Poller.schedule(appCtx)
+            KeepAliveService.stop(appCtx)
+        }
         seenStore.remove(id)
     }
 

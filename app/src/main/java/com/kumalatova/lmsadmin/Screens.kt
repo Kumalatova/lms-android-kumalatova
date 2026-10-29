@@ -260,6 +260,12 @@ fun HomeScreen(
                     )
                 }
                 Text(
+                    text = "Последний фоновый опрос: " + Diag.lastAlarmText(androidx.compose.ui.platform.LocalContext.current),
+                    color = LmsColors.Dim,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                )
+                Text(
                     text = "Версия приложения $versionName",
                     color = LmsColors.Dim,
                     fontSize = 12.sp,
