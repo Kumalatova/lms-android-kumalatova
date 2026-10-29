@@ -25,49 +25,12 @@ object Notifier {
 
     fun siteChannelId(siteId: String) = "site_$siteId"
 
-    const val SERVICE_CHANNEL = "service_quiet"
-    const val FGS_ID = 1
-
-    /** Прежний заметный канал службы убираем. */
+    /** Постоянного уведомления больше нет: убираем каналы прежних версий. */
     fun removeOldServiceChannels(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
-        ctx.getSystemService(NotificationManager::class.java).deleteNotificationChannel("service")
-    }
-
-    /** Канал службы-якоря: минимальная важность, без значка в строке состояния и без звука. */
-    fun ensureServiceChannel(ctx: Context) {
-        if (Build.VERSION.SDK_INT < 26) return
-        val channel = NotificationChannel(
-            SERVICE_CHANNEL,
-            "Работа в фоне",
-            NotificationManager.IMPORTANCE_MIN,
-        ).apply {
-            description = "Тихое уведомление, пока приложение следит за сайтами"
-            setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_SECRET
-        }
-        ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-
-    fun foregroundNotification(ctx: Context, text: String): Notification {
-        val open = PendingIntent.getActivity(
-            ctx,
-            0,
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        return NotificationCompat.Builder(ctx, SERVICE_CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("LMS Админ")
-            .setContentText(text)
-            .setColor(ACCENT)
-            .setOngoing(true)
-            .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setContentIntent(open)
-            .build()
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel("service")
+        manager.deleteNotificationChannel("service_quiet")
     }
 
     fun ensureSiteChannel(ctx: Context, site: Site) {

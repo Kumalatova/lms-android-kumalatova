@@ -93,7 +93,6 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Poller.schedule(this)
-        KeepAliveService.start(this)
         vm.checkUpdate()
     }
 

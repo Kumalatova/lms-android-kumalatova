@@ -106,11 +106,8 @@ object Poller {
 class PollReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext
-        Diag.markAlarm(app)
         // Следующий опрос ставим сразу: цепочка не оборвётся, даже если этот не удастся.
         Poller.schedule(app)
-        // Если систему закрыла службу-якорь, поднимаем её снова.
-        KeepAliveService.start(app)
 
         val result = goAsync()
         val pm = app.getSystemService(Context.POWER_SERVICE) as PowerManager
